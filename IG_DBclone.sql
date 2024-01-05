@@ -2,13 +2,13 @@
 -- USE ig_clone;
 
 CREATE TABLE Users (
-	ID INT PRIMARY KEY AUTO_INCREMENT,
+    ID INT PRIMARY KEY AUTO_INCREMENT,
     Username VARCHAR(255) UNIQUE NOT NULL,
     Created_at TIMESTAMP DEFAULT NOW()
 );
 
 CREATE TABLE Photos (
-	ID INT PRIMARY KEY AUTO_INCREMENT,
+    ID INT PRIMARY KEY AUTO_INCREMENT,
     Image_url VARCHAR(255) NOT NULL,
     UserID INT NOT NULL,
     posted_at TIMESTAMP DEFAULT now(),
@@ -16,8 +16,8 @@ CREATE TABLE Photos (
 );
 
 CREATE TABLE Comments (
-	ID INT PRIMARY KEY AUTO_INCREMENT,
-	Comment_text VARCHAR(255) NOT NULL,
+    ID INT PRIMARY KEY AUTO_INCREMENT,
+    Comment_text VARCHAR(255) NOT NULL,
     UserID INT NOT NULL,
     PhotoID INT NOT NULL,
     Posted_at TIMESTAMP DEFAULT NOW(),
@@ -35,7 +35,7 @@ CREATE TABLE Likes (
 );
 
 CREATE TABLE Followers (
-	FollowerID INT NOT NULL,
+    FollowerID INT NOT NULL,
     FolloweeID INT NOT NULL,
     Followed_at TIMESTAMP DEFAULT NOW(),
     FOREIGN KEY (followerID) REFERENCES users(ID),
@@ -44,13 +44,13 @@ CREATE TABLE Followers (
 );
 
 CREATE TABLE Tags (
-	ID INT AUTO_INCREMENT PRIMARY KEY,
+    ID INT AUTO_INCREMENT PRIMARY KEY,
     Tag_name VARCHAR(255) NOT NULL,
     Created_at TIMESTAMP DEFAULT NOW()
 );
 
 CREATE TABLE Photo_tags (
-	PhotoID INT NOT NULL,
+    PhotoID INT NOT NULL,
     TagID INT NOT NULL,
     FOREIGN KEY (PhotoID) REFERENCES Photos(ID),
     FOREIGN KEY (TagID) REFERENCES Tags(ID),
@@ -89,3 +89,48 @@ SELECT * from users
 LEFT JOIN photos on
 users.id = ohotos.UserID
 where photos.id is null;
+
+-- adding triggers to our database
+
+DELIMITER $$
+CREATE TRIGGER prevent_self_follows
+    BEFORE INSERT ON followers FOR EACH ROW
+    BEGIN
+	IF NEW.followerid = NEW.followeeid
+        THEN
+	    SIGNAL SQLSTATE '45000'
+	    SET MESSAGE_TEXT = "Can't follow yourself";
+	END IF;
+    END
+$$
+DELIMITER ;
+
+INSERT INTO followers (followerid, followeeid) VALUES(5,5);
+
+CREATE TABLE Unfollows (
+    FollowerID INT NOT NULL,
+    FolloweeID INT NOT NULL,
+    Followed_at TIMESTAMP DEFAULT NOW(),
+    FOREIGN KEY (followerID) REFERENCES users(ID),
+    FOREIGN KEY (followeeID) REFERENCES users(ID),
+    CONSTRAINT follower_followee_unique PRIMARY KEY (FollowerID, FolloweeID)
+);
+
+DELIMITER $$
+CREATE TRIGGER records_unfollows
+    AFTER DELETE ON followers FOR EACH ROW
+    BEGIN
+	INSERT INTO unfollows
+        SET followerid = old.followerid,
+	    followeeid = old.followeeid;
+    END
+$$
+DELIMITER ;
+
+DELETE from followers where FollowerID = 3 AND FolloweeID = 5;
+
+SELECT * from unfollows;
+
+DELETE from followers where FollowerID = 3;
+
+SHOW TRIGGERS;
